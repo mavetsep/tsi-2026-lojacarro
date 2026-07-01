@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Loja de Carros</title>
+<style>
+  :root{
+    --bg:#f7f6f2; --surface:#ffffff; --border:#d4d1ca; --text:#28251d;
+    --text-muted:#7a7974; --primary:#01696f; --primary-hover:#0c4e54;
+    --error:#a12c7b; --radius:8px;
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  body{font-family:'Segoe UI',Arial,sans-serif; background:var(--bg); color:var(--text); min-height:100vh;}
+  .container{max-width:960px; margin:0 auto; padding:24px 16px;}
+  header{display:flex; justify-content:space-between; align-items:center; margin-bottom:24px;}
+  h1{font-size:1.5rem;}
+  .card{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:24px; margin-bottom:24px;}
+  label{display:block; font-size:0.85rem; margin-bottom:4px; color:var(--text-muted);}
+  input, select{width:100%; padding:10px; border:1px solid var(--border); border-radius:var(--radius); margin-bottom:12px; font-size:1rem;}
+  button{background:var(--primary); color:#fff; border:none; padding:10px 20px; border-radius:var(--radius); cursor:pointer; font-size:0.95rem;}
+  button:hover{background:var(--primary-hover);}
+  button.secondary{background:var(--text-muted);}
+  button.danger{background:var(--error);}
+  table{width:100%; border-collapse:collapse; margin-top:12px;}
+  th, td{text-align:left; padding:10px; border-bottom:1px solid var(--border); font-size:0.9rem;}
+  th{color:var(--text-muted); font-weight:600;}
+  .actions button{margin-right:6px; padding:6px 12px; font-size:0.8rem;}
+  .hidden{display:none;}
+  #msg{margin-bottom:16px; padding:10px; border-radius:var(--radius); font-size:0.9rem;}
+  #msg.error{background:#f3d9ea; color:var(--error);}
+  #msg.success{background:#d4dfcc; color:#2e5c10;}
+  .config-row{display:flex; gap:8px; align-items:center; margin-bottom:16px;}
+  .config-row input{margin-bottom:0;}
+  .logout{background:none; color:var(--error); text-decoration:underline; padding:4px;}
+</style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>🚗 Loja de Carros</h1>
+    <button id="btnLogout" class="logout hidden">Sair</button>
+  </header>
+
+  <div id="msg" class="hidden"></div>
+
+  <!-- CONFIG DA API -->
+  <div class="card">
+    <label for="apiUrl">URL da API (backend Spring Boot)</label>
+    <div class="config-row">
+      <input type="text" id="apiUrl" value="http://localhost:8080" placeholder="http://localhost:8080">
+      <button id="btnSalvarUrl">Salvar</button>
+    </div>
+  </div>
+
+  <!-- LOGIN -->
+  <div class="card" id="loginCard">
+    <h2 style="margin-bottom:16px;">Login</h2>
+    <label for="login">Usuário</label>
+    <input type="text" id="login" placeholder="admin">
+    <label for="senha">Senha</label>
+    <input type="password" id="senha" placeholder="******">
+    <button id="btnLogin">Entrar</button>
+  </div>
+
+  <!-- CRUD CARROS -->
+  <div class="card hidden" id="crudCard">
+    <h2 style="margin-bottom:16px;" id="formTitle">Cadastrar Carro</h2>
+    <input type="hidden" id="carroId">
+    <label for="marca">Marca</label>
+    <input type="text" id="marca" placeholder="Toyota">
+    <label for="modelo">Modelo</label>
+    <input type="text" id="modelo" placeholder="Corolla">
+    <label for="ano">Ano</label>
+    <input type="number" id="ano" placeholder="2023">
+    <button id="btnSalvarCarro">Salvar</button>
+    <button id="btnCancelarEdicao" class="secondary hidden">Cancelar</button>
+  </div>
+
+  <div class="card hidden" id="listaCard">
+    <h2 style="margin-bottom:8px;">Carros cadastrados</h2>
+    <button id="btnAtualizarLista" class="secondary">Atualizar lista</button>
+    <table>
+      <thead>
+        <tr><th>ID</th><th>Marca</th><th>Modelo</th><th>Ano</th><th>Ações</th></tr>
+      </thead>
+      <tbody id="tabelaCarros"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+let API_URL = localStorage.getItem('apiUrl') || 'http://localhost:8080';
+document.getElementById('apiUrl').value = API_URL;
+let TOKEN = null;
+
+function showMsg(text, type){
+  const msg = document.getElementById('msg');
+  msg.textContent = text;
+  msg.className = type;
+  msg.classList.remove('hidden');
+  setTimeout(()=> msg.classList.add('hidden'), 4000);
+}
+
+document.getElementById('btnSalvarUrl').addEventListener('click', ()=>{
+  API_URL = document.getElementById('apiUrl').value.trim();
+  localStorage.setItem('apiUrl', API_URL);
+  showMsg('URL da API salva: ' + API_URL, 'success');
+});
+
+document.getElementById('btnLogin').addEventListener('click', async ()=>{
+  const login = document.getElementById('login').value.trim();
+  const senha = document.getElementById('senha').value.trim();
+  if(!login || !senha){ showMsg('Preencha usuário e senha', 'error'); return; }
+  try{
+    const res = await fetch(API_URL + '/login', {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({login, senha})
+    });
+    if(!res.ok) throw new Error('Credenciais inválidas');
+    const data = await res.json();
+    TOKEN = data.token || data.accessToken || data;
+    if(typeof TOKEN === 'object' && TOKEN.token) TOKEN = TOKEN.token;
+    showMsg('Login realizado com sucesso!', 'success');
+    document.getElementById('loginCard').classList.add('hidden');
+    document.getElementById('crudCard').classList.remove('hidden');
+    document.getElementById('listaCard').classList.remove('hidden');
+    document.getElementById('btnLogout').classList.remove('hidden');
+    carregarCarros();
+  }catch(err){
+    showMsg('Erro ao fazer login: ' + err.message, 'error');
+  }
+});
+
+document.getElementById('btnLogout').addEventListener('click', ()=>{
+  TOKEN = null;
+  document.getElementById('loginCard').classList.remove('hidden');
+  document.getElementById('crudCard').classList.add('hidden');
+  document.getElementById('listaCard').classList.add('hidden');
+  document.getElementById('btnLogout').classList.add('hidden');
+});
+
+async function carregarCarros(){
+  try{
+    const res = await fetch(API_URL + '/carro', {
+      headers: {'Authorization': 'Bearer ' + TOKEN}
+    });
+    if(!res.ok) throw new Error('Falha ao buscar carros (status ' + res.status + ')');
+    const carros = await res.json();
+    const tbody = document.getElementById('tabelaCarros');
+    tbody.innerHTML = '';
+    carros.forEach(c=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${c.id}</td>
+        <td>${c.marca || '-'}</td>
+        <td>${c.modelo}</td>
+        <td>${c.ano}</td>
+        <td class="actions">
+          <button class="secondary" onclick="editarCarro(${c.id}, '${c.marca||''}', '${c.modelo}', ${c.ano})">Editar</button>
+          <button class="danger" onclick="deletarCarro(${c.id})">Excluir</button>
+        </td>`;
+      tbody.appendChild(tr);
+    });
+  }catch(err){
+    showMsg('Erro: ' + err.message, 'error');
+  }
+}
+
+document.getElementById('btnAtualizarLista').addEventListener('click', carregarCarros);
+
+function editarCarro(id, marca, modelo, ano){
+  document.getElementById('carroId').value = id;
+  document.getElementById('marca').value = marca;
+  document.getElementById('modelo').value = modelo;
+  document.getElementById('ano').value = ano;
+  document.getElementById('formTitle').textContent = 'Editar Carro #' + id;
+  document.getElementById('btnCancelarEdicao').classList.remove('hidden');
+}
+
+document.getElementById('btnCancelarEdicao').addEventListener('click', limparForm);
+
+function limparForm(){
+  document.getElementById('carroId').value = '';
+  document.getElementById('marca').value = '';
+  document.getElementById('modelo').value = '';
+  document.getElementById('ano').value = '';
+  document.getElementById('formTitle').textContent = 'Cadastrar Carro';
+  document.getElementById('btnCancelarEdicao').classList.add('hidden');
+}
+
+document.getElementById('btnSalvarCarro').addEventListener('click', async ()=>{
+  const id = document.getElementById('carroId').value;
+  const marca = document.getElementById('marca').value.trim();
+  const modelo = document.getElementById('modelo').value.trim();
+  const ano = parseInt(document.getElementById('ano').value);
+
+  if(!modelo || !ano){ showMsg('Preencha modelo e ano', 'error'); return; }
+
+  const payload = { marca, modelo, ano };
+
+  try{
+    let res;
+    if(id){
+      res = await fetch(API_URL + '/carro/' + id, {
+        method: 'PUT',
+        headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + TOKEN},
+        body: JSON.stringify(payload)
+      });
+    } else {
+      res = await fetch(API_URL + '/carro/salvar', {
+        method: 'POST',
+        headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + TOKEN},
+        body: JSON.stringify(payload)
+      });
+    }
+    if(!res.ok) throw new Error('Falha ao salvar (status ' + res.status + ')');
+    showMsg(id ? 'Carro atualizado!' : 'Carro cadastrado!', 'success');
+    limparForm();
+    carregarCarros();
+  }catch(err){
+    showMsg('Erro: ' + err.message, 'error');
+  }
+});
+
+async function deletarCarro(id){
+  if(!confirm('Deseja realmente excluir o carro #' + id + '?')) return;
+  try{
+    const res = await fetch(API_URL + '/carro/' + id, {
+      method: 'DELETE',
+      headers: {'Authorization': 'Bearer ' + TOKEN}
+    });
+    if(!res.ok) throw new Error('Falha ao excluir (status ' + res.status + ')');
+    showMsg('Carro excluído!', 'success');
+    carregarCarros();
+  }catch(err){
+    showMsg('Erro: ' + err.message, 'error');
+  }
+}
+</script>
+</body>
+</html>

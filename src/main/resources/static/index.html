@@ -30,8 +30,6 @@
   #msg{margin-bottom:16px; padding:10px; border-radius:var(--radius); font-size:0.9rem;}
   #msg.error{background:#f3d9ea; color:var(--error);}
   #msg.success{background:#d4dfcc; color:#2e5c10;}
-  .config-row{display:flex; gap:8px; align-items:center; margin-bottom:16px;}
-  .config-row input{margin-bottom:0;}
   .logout{background:none; color:var(--error); text-decoration:underline; padding:4px;}
 </style>
 </head>
@@ -43,15 +41,6 @@
   </header>
 
   <div id="msg" class="hidden"></div>
-
-  <!-- CONFIG DA API -->
-  <div class="card">
-    <label for="apiUrl">URL da API (backend Spring Boot)</label>
-    <div class="config-row">
-      <input type="text" id="apiUrl" value="http://localhost:8080" placeholder="http://localhost:8080">
-      <button id="btnSalvarUrl">Salvar</button>
-    </div>
-  </div>
 
   <!-- LOGIN -->
   <div class="card" id="loginCard">
@@ -90,8 +79,6 @@
 </div>
 
 <script>
-let API_URL = localStorage.getItem('apiUrl') || 'http://localhost:8080';
-document.getElementById('apiUrl').value = API_URL;
 let TOKEN = null;
 
 function showMsg(text, type){
@@ -102,18 +89,12 @@ function showMsg(text, type){
   setTimeout(()=> msg.classList.add('hidden'), 4000);
 }
 
-document.getElementById('btnSalvarUrl').addEventListener('click', ()=>{
-  API_URL = document.getElementById('apiUrl').value.trim();
-  localStorage.setItem('apiUrl', API_URL);
-  showMsg('URL da API salva: ' + API_URL, 'success');
-});
-
 document.getElementById('btnLogin').addEventListener('click', async ()=>{
   const login = document.getElementById('login').value.trim();
   const senha = document.getElementById('senha').value.trim();
   if(!login || !senha){ showMsg('Preencha usuário e senha', 'error'); return; }
   try{
-    const res = await fetch(API_URL + '/login', {
+    const res = await fetch('/login', {
       method: 'POST',
       headers: {'Content-Type':'application/json'},
       body: JSON.stringify({login, senha})
@@ -143,7 +124,7 @@ document.getElementById('btnLogout').addEventListener('click', ()=>{
 
 async function carregarCarros(){
   try{
-    const res = await fetch(API_URL + '/carro', {
+    const res = await fetch('/carro', {
       headers: {'Authorization': 'Bearer ' + TOKEN}
     });
     if(!res.ok) throw new Error('Falha ao buscar carros (status ' + res.status + ')');
@@ -203,13 +184,13 @@ document.getElementById('btnSalvarCarro').addEventListener('click', async ()=>{
   try{
     let res;
     if(id){
-      res = await fetch(API_URL + '/carro/' + id, {
+      res = await fetch('/carro/' + id, {
         method: 'PUT',
         headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + TOKEN},
         body: JSON.stringify(payload)
       });
     } else {
-      res = await fetch(API_URL + '/carro/salvar', {
+      res = await fetch('/carro/salvar', {
         method: 'POST',
         headers: {'Content-Type':'application/json', 'Authorization': 'Bearer ' + TOKEN},
         body: JSON.stringify(payload)
@@ -227,7 +208,7 @@ document.getElementById('btnSalvarCarro').addEventListener('click', async ()=>{
 async function deletarCarro(id){
   if(!confirm('Deseja realmente excluir o carro #' + id + '?')) return;
   try{
-    const res = await fetch(API_URL + '/carro/' + id, {
+    const res = await fetch('/carro/' + id, {
       method: 'DELETE',
       headers: {'Authorization': 'Bearer ' + TOKEN}
     });
